@@ -1,3 +1,5 @@
+# Setup and Globals for MPK249 Kontakte V1 Script
+#
 # ============= Common ===============
 # PLAY          = Start Playback
 # STOP          = Stop Playback
@@ -21,10 +23,10 @@
 # Button 2      = Switch View
 # Button 3      = Device Off
 # Button 4      = Unmute All
-# Button 5      = NONE
-# Button 6      = NONE
-# Button 7      = NONE
-# Button 8      = NONE
+# Button 5      = Session Box Up
+# Button 6      = Session Box Down
+# Button 7      = Session Box Left
+# Button 8      = Session Box Right 
 
 # =============== Pads ===============
 
@@ -41,5 +43,14 @@
 # Pads          = Scene Trigger
 
 chan = 0
-num_tracks = 8
-num_scenes = 16
+pad_chan = 9
+num_tracks = 4
+num_scenes = 4
+PAD_ROWS = [[48, 49, 50, 51],
+            [44, 45, 46, 47],
+            [40, 41, 42, 43],
+            [36, 37, 38, 39]]
+ARM_PAD_ROWS = [[],
+                []]
+STOP_PAD_ROWS = [[],
+                []]
