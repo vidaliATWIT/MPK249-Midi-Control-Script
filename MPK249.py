@@ -21,9 +21,12 @@ from .GLOBALS import *
 
 # TODO:
 # xFix transport playback (check how other people do it) (no self on instantiate)
-# -Set up clip launching
-# -Set up drum pads
-# -Map rest of Knobs
+# xSet up clip launching
+# xLook into setting up a create_toggle_pad for clip arming
+# xSet up drum pads
+# xRe-Map rest of Knobs
+#   xKnobs need to bed different functions cuz switching back and forth on the same controls doesn't work
+# -Set up capture midi
 
 class MPK249(ControlSurface):
     __module__ = __name__
@@ -40,7 +43,7 @@ class MPK249(ControlSurface):
             self._create_device()
     
     def msg_test(self):
-        log_msg = "#################### LOG FROM MPK249 ########################\nHello from the MPK remote script!\n( . Y . )"
+        log_msg = "#################### LOG FROM MPK249 ########################\nHello from the MPK remote script!\n( . Y . )\n"
         reg_msg = "MPK249 Kontakte V1 Script Loaded."
         self.show_message(reg_msg)
         self.log_message(log_msg)
@@ -61,9 +64,13 @@ class MPK249(ControlSurface):
             self.log_message("CREATING %s, identifier %s" % (name, identifier))
             return ButtonElement(is_momentary=False, msg_type=midi_type, channel=chan, identifier=identifier, name=name)
 
-        def _make_pad_button(identifier, name, midi_type=0):
+        def _make_pad(identifier, name, midi_type=0):
             self.log_message("CREATING %s, identifier %s" % (name, identifier))
             return ButtonElement(is_momentary=True, msg_type=midi_type, channel=pad_chan, identifier=identifier, name=name)
+        
+        def _make_pad_toggle(identifier, name, midi_type=0):
+            self.log_message("CREATING %s, identifier %s" % (name, identifier))
+            return ButtonElement(is_momentary=False, msg_type=midi_type, channel=pad_chan, identifier=identifier, name=name)
         
         #self, is_momentary, msg_type, channel, identifier
 
@@ -88,7 +95,14 @@ class MPK249(ControlSurface):
             [_make_encoder(3, 'encoder_1'), _make_encoder(9, 'encoder_2'),
             _make_encoder(14, 'encoder_3'), _make_encoder(15, 'encoder_4'),
             _make_encoder(16 , 'encoder_5'), _make_encoder(17, 'encoder_6'),
-            _make_encoder(18, 'encoder_7'), _make_encoder(20, 'encoder_1')]
+            _make_encoder(19, 'encoder_7'), _make_encoder(20, 'encoder_1')]
+        ])
+
+        self._pan_encoders = ButtonMatrixElement(rows=[
+            [_make_encoder(52, 'pan_1'), _make_encoder(53, 'pan_2'),
+            _make_encoder(54, 'pan_3'), _make_encoder(55, 'pan_4'),
+            _make_encoder(57, 'pan_5'), _make_encoder(58, 'pan_6'),
+            _make_encoder(59, 'pan_7'), _make_encoder(60, 'pan_1')]
         ])
 
         # Creating Mute Buttons
@@ -110,14 +124,30 @@ class MPK249(ControlSurface):
         ])
 
         # Create Scene Buttons
-        self._scene_buttons = ButtonMatrixElement(rows = [
-            [_make_pad_button(87 + i*4, 'scene %d' % (i)) for i in range(4)]
-        ])
+        self._scene_buttons = ButtonMatrixElement(rows=[
+            [_make_pad(identifier, 'clip %d' % (identifier)) for identifier in row] 
+            for row in SCENE_PADS])
 
         # Create Clip Launch Pads
         self._clip_launch_buttons = ButtonMatrixElement(rows=[
-            [_make_pad_button(identifier, 'clip %d' % (identifier)) for identifier in row] 
+            [_make_pad(identifier, 'clip %d' % (identifier)) for identifier in row] 
             for row in PAD_ROWS])
+        
+        # Create Arm Track Buttons
+        self._arm_track_buttons = ButtonMatrixElement(rows=[
+            [_make_pad_toggle(identifier, 'arm track %d' % (identifier)) for identifier in row] 
+            for row in ARM_PAD_ROWS])
+        
+        # Create Stop Clip Buttons
+        self._stop_clip_buttons = ButtonMatrixElement(rows=[
+            [_make_pad(identifier, 'stop clip %d' % (identifier)) for identifier in row] 
+            for row in STOP_PAD_ROWS])
+
+        # Create Track Select Buttons
+        self._track_select_buttons = ButtonMatrixElement(rows=[
+            [_make_pad_toggle(identifier, 'track %d' % (identifier)) for identifier in row] 
+            for row in TRACK_SELECT_PADS])
+
 
         ##[make_encoder(7 + i, 'Volume_%d' % (i+1)) for i in range(1)]])
 
@@ -128,8 +158,8 @@ class MPK249(ControlSurface):
         self._stop_button = _make_button(117, 'stop')
         self._rec_button = _make_button(119, 'record')
         self._arm_button = _make_button(115, 'arm track') ##ffwd
-        ##self._capture_midi_button = _make_button(116, 'capture midi') ##rev
-    
+        self._capture_midi_button = _make_pad(84, 'capture midi') ##rev
+
     # Create Session Component
     def _create_session(self):
         self.log_message("############## Session Created ################")
@@ -146,9 +176,13 @@ class MPK249(ControlSurface):
         # Set stop all clips button
         self._session.set_stop_all_clips_button(self._util_buttons[3])
 
+        # Set up clip launching 4x4 grid and 2x4 clip stopping grid
         if self._clip_launch_buttons:
             self._clip_launch_buttons.reset()
         self._session.set_clip_launch_buttons(self._clip_launch_buttons)
+        if self._stop_clip_buttons:
+            self._stop_clip_buttons.reset()
+        self._session.set_stop_track_clip_buttons(self._stop_clip_buttons)
 
     # Craete Transport Component NOT WORKING
     def _create_transport(self):
@@ -166,11 +200,34 @@ class MPK249(ControlSurface):
         #Make sure we are focused on the first track upon opening Live Set
         self.song().view.selected_track = self._mixer.channel_strip(0)._track
         self._mixer.set_volume_controls(self._faders)
+        self._mixer.set_pan_controls(self._pan_encoders)
         self._mixer.set_mute_buttons(self._mute_buttons)
         self._mixer.set_solo_buttons(self._solo_buttons)
+        if (self._arm_track_buttons):
+            self._arm_track_buttons.reset()
+        self._mixer.set_arm_buttons(self._arm_track_buttons)
+        if (self._track_select_buttons):
+            self._track_select_buttons.reset()
+        self._mixer.set_track_select_buttons(self._track_select_buttons)
 
     def _create_device(self):
         self.log_message("=======================Device Created==========================")
         self._device = DeviceComponent(name='Device Component', is_enabled=True, device_selection_follows_track_selection=True)
         self._device.set_parameter_controls(self._encoders)
         self.set_device_component(self._device)
+
+    '''
+    @capture_midi_button.pressed
+    def capture_midi_button(self, _):
+        self.show_message("MIDI CAPTURED")
+        
+        try:
+            if self.song.can_capture_midi:
+                self.song.capture_midi()
+        '''
+    '''
+    capture_midi_button = ButtonControl()
+    @capture_midi_button.pressed
+    def capture_midi_button(self, button):
+            self.song.capture_midi()
+    '''
