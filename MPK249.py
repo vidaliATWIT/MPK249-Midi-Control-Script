@@ -43,7 +43,7 @@ class MPK249(ControlSurface):
             self._create_device()
     
     def msg_test(self):
-        log_msg = "#################### LOG FROM MPK249 ########################\nHello from the MPK remote script!\n( . Y . )\n"
+        log_msg = "#################### LOG FROM MPK249 ########################\nHello from the MPK remote script!\n"
         reg_msg = "MPK249 Kontakte V1 Script Loaded."
         self.show_message(reg_msg)
         self.log_message(log_msg)
